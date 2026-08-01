@@ -1,0 +1,70 @@
+name: Bug report
+description: Something in the image or the cbox CLI is not working as expected
+labels: ["bug"]
+body:
+  - type: input
+    id: image-tag
+    attributes:
+      label: Image tag
+      description: e.g. ghcr.io/tungbq/claudebox:0.1.0 or :latest
+      placeholder: ghcr.io/tungbq/claudebox:latest
+    validations:
+      required: true
+
+  - type: input
+    id: host-os
+    attributes:
+      label: Host OS
+      placeholder: macOS 15 / Ubuntu 24.04 / Windows 11 + WSL2
+    validations:
+      required: true
+
+  - type: input
+    id: docker-version
+    attributes:
+      label: Docker version
+      description: Output of `docker version --format '{{.Server.Version}}'`
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affected-component
+    attributes:
+      label: Affected component
+      options:
+        - Claude Code
+        - cbox helper CLI
+        - Entrypoint / uid-gid remap
+        - Config persistence (~/.cbox)
+        - VS Code integration
+        - Not component-specific
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact `docker run` command if possible
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      render: shell

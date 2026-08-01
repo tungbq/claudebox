@@ -1,0 +1,132 @@
+name: PR build, test, scan
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - scripts/**
+      - npm-lockfiles/**
+      - cli/**
+      - entrypoint.sh
+      - tests/**
+      - claudebox_info.json
+      - .trivyignore
+      - .github/workflows/pr-build-test.yml
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - scripts/**
+      - npm-lockfiles/**
+      - cli/**
+      - entrypoint.sh
+      - tests/**
+      - claudebox_info.json
+      - .trivyignore
+      - .github/workflows/pr-build-test.yml
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck cli/ and entrypoint.sh
+        run: |
+          shellcheck --shell=sh cli/cbox cli/cmd/*.sh scripts/lib/common.sh
+          shellcheck entrypoint.sh scripts/bootstrap-config.sh scripts/install-*.sh \
+            scripts/gen-lockfile.sh scripts/gen-version-table.sh \
+            scripts/verify-versions.sh scripts/smoke-test.sh scripts/check-upstream-versions.sh
+
+  build-test-scan:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+        include:
+          - platform: linux/amd64
+            arch_label: amd64
+          - platform: linux/arm64
+            arch_label: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+        if: matrix.platform == 'linux/arm64'
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Set build metadata
+        id: meta
+        run: echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          push: false
+          load: true
+          tags: claudebox:dev
+          build-args: |
+            BUILD_DATE=${{ steps.meta.outputs.build_date }}
+            REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.arch_label }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch_label }}
+
+      - name: Base image checks
+        run: |
+          docker run --rm claudebox:dev id agent | grep -q 'uid=1000(agent) gid=1000(agent)'
+          if docker run --rm claudebox:dev id ubuntu >/dev/null 2>&1; then
+            echo "error: stock ubuntu user unexpectedly present" >&2
+            exit 1
+          fi
+          docker run --rm claudebox:dev node --version | grep -q '^v22\.'
+          docker run --rm claudebox:dev python3 --version | grep -q '^Python 3\.12'
+          for bin in git gh rg fd jq yq gosu uv claude; do
+            docker run --rm claudebox:dev which "$bin"
+          done
+          if docker run --rm claudebox:dev which sudo >/dev/null 2>&1; then
+            echo "error: sudo unexpectedly present in image" >&2
+            exit 1
+          fi
+          if docker run --rm claudebox:dev which gcc >/dev/null 2>&1; then
+            echo "error: gcc unexpectedly present in image (build-essential should be cut)" >&2
+            exit 1
+          fi
+
+      - name: Claude Code + version tooling checks
+        run: |
+          scripts/verify-versions.sh claudebox:dev
+          scripts/smoke-test.sh claudebox:dev
+
+      - name: cbox CLI checks (bats)
+        run: |
+          docker run --rm claudebox:dev cbox >/dev/null
+          docker run --rm claudebox:dev claudebox >/dev/null
+          git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
+          IMAGE=claudebox:dev /tmp/bats-core/bin/bats tests/test-cbox.bats
+
+      - name: Trivy scan (fixable HIGH/CRITICAL blocks merge)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: claudebox:dev
+          format: sarif
+          output: trivy-results-${{ matrix.arch_label }}.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+          trivyignores: .trivyignore
+
+      - name: Upload Trivy results to the Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results-${{ matrix.arch_label }}.sarif
+          category: trivy-${{ matrix.arch_label }}

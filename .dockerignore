@@ -1,0 +1,7 @@
+# Keep the build context small — none of this is needed inside the image.
+.git
+.github
+docs/
+plans/
+tests/
+*.md

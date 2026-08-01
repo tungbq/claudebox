@@ -1,0 +1,40 @@
+# Format: one CVE per entry, with a dated justification comment directly above it.
+# Example:
+#   # CVE-2026-XXXXX: no fix available upstream as of 2026-08-01; re-review 2026-11-01.
+#   CVE-2026-XXXXX
+#
+# Entries get added only against CVEs actually observed in a scan, never to make a
+# build go green. This file starts empty — see docs/build.md for the review cadence.
+
+# gosu 1.19 is the latest release (verified via GitHub API 2026-08-01); its statically
+# compiled Go stdlib (go1.24.6) predates fixes for the CVEs below. No newer gosu release
+# exists to bump to. Re-review 2026-11-01.
+CVE-2025-68121
+CVE-2025-61726
+CVE-2025-61729
+CVE-2026-25679
+CVE-2026-27145
+CVE-2026-32280
+CVE-2026-32281
+CVE-2026-32283
+CVE-2026-33811
+CVE-2026-33814
+CVE-2026-39820
+CVE-2026-39836
+CVE-2026-42499
+CVE-2026-42504
+
+# yq v4.53.3 is the latest release (verified via GitHub API 2026-08-01); same class of
+# issue — statically compiled Go stdlib (go1.26.4) and golang.org/x/text predate fixes.
+# CVE-2026-39822 also affects gosu (already listed above); golang.org/x/text is
+# yq-specific. Re-review 2026-11-01.
+CVE-2026-39822
+CVE-2026-56852
+
+# npm 12.0.1's own bundled brace-expansion (5.0.7, under
+# /usr/local/lib/node_modules/npm/node_modules/) carries this CVE. `npm install -g
+# npm@12.0.2` (the only newer patch available as of 2026-08-01) does not replace it —
+# npm's self-upgrade leaves its own currently-running install directory untouched, a
+# known npm limitation, not something this Dockerfile can force. Not our code to patch
+# directly; tracked for the next Node/npm version bump. Re-review 2026-11-01.
+CVE-2026-14257

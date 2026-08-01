@@ -1,0 +1,65 @@
+name: Scheduled security scan
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan-latest:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check whether an image has been published yet
+        id: check
+        run: |
+          if docker pull ghcr.io/${{ github.repository }}:latest; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "no ghcr.io/${{ github.repository }}:latest published yet — nothing to scan, skipping"
+          fi
+
+      - name: Trivy scan (report only, does not fail the job)
+        if: steps.check.outputs.exists == 'true'
+        id: trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        continue-on-error: true
+        with:
+          image-ref: ghcr.io/${{ github.repository }}:latest
+          format: sarif
+          output: trivy-latest.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+          trivyignores: .trivyignore
+
+      - name: Upload results to the Security tab
+        if: steps.check.outputs.exists == 'true'
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-latest.sarif
+          category: trivy-scheduled-latest
+
+      - name: Open an issue if new HIGH/CRITICAL findings and none already tracked
+        if: steps.check.outputs.exists == 'true' && steps.trivy.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh issue list --label security-scan --state open --json number \
+            --jq 'length > 0' | grep -q true; then
+            echo "an open security-scan issue already exists — not filing a duplicate"
+            exit 0
+          fi
+          gh issue create \
+            --title "Weekly scan: fixable HIGH/CRITICAL findings in ghcr.io/${{ github.repository }}:latest" \
+            --label security-scan \
+            --body "Trivy found fixable HIGH/CRITICAL vulnerabilities in the published \`:latest\` image not covered by \`.trivyignore\`. See the Security tab (category \`trivy-scheduled-latest\`) for the full SARIF report from this run: ${{ github.server_url }}/${{ github.repository }}/security/code-scanning?query=is%3Aopen+category%3Atrivy-scheduled-latest"

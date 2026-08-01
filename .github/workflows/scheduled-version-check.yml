@@ -1,0 +1,69 @@
+name: Scheduled version check
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-24.04
+    # This tracks entries with an npm key — for claudebox that is exactly one of seven
+    # (claude-code). node, npm, uv, and yq carry exact pins tracked only in their install
+    # scripts; gh and python are intentionally ".x". A green run here does not mean all
+    # seven are current — see docs/build.md.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check upstream npm versions
+        id: check
+        run: |
+          scripts/check-upstream-versions.sh --patch /tmp/patched-manifest.json | tee /tmp/drift-summary.md
+          if diff -q claudebox_info.json /tmp/patched-manifest.json >/dev/null; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            cp /tmp/patched-manifest.json claudebox_info.json
+          fi
+
+      # claude-code is the only npm-tracked tool, and it's also the one entry with a
+      # load-bearing postinstall gated by allowScripts. Deliberately do NOT run
+      # gen-lockfile.sh or `npm install --package-lock-only` here: doing so would
+      # mechanically re-grant allowScripts for the new version with no human in the
+      # loop — the one control that gates install-time code execution, auto-approved at
+      # exactly the moment it matters. Bumping only the manifest leaves package.json /
+      # package-lock.json pointing at the old version, so verify-versions.sh fails loudly
+      # on the resulting PR until a human runs `scripts/gen-lockfile.sh` themselves,
+      # reviews the new allowScripts entry, and pushes it as a follow-up commit.
+      - name: Regenerate version table (manifest only, not the lockfile)
+        if: steps.check.outputs.drift == 'true'
+        run: scripts/gen-version-table.sh --inject README.md
+
+      - name: Require a PAT for the bump PR to trigger CI
+        if: steps.check.outputs.drift == 'true'
+        env:
+          BUMP_PR_TOKEN: ${{ secrets.BUMP_PR_TOKEN }}
+        run: |
+          if [ -z "$BUMP_PR_TOKEN" ]; then
+            echo "error: BUMP_PR_TOKEN secret is not set. A PR opened with the default" >&2
+            echo "GITHUB_TOKEN does not trigger this repo's own pull_request workflows," >&2
+            echo "so the bump PR would show green with zero checks run. Create a PAT with" >&2
+            echo "repo scope and store it as the BUMP_PR_TOKEN secret — see docs/build.md." >&2
+            exit 1
+          fi
+
+      - name: Open a bump PR
+        if: steps.check.outputs.drift == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.BUMP_PR_TOKEN }}
+          commit-message: "fix: bump drifted claude-code version to latest npm release"
+          title: "Automated version bump: claude-code drifted from npm latest"
+          body-path: /tmp/drift-summary.md
+          branch: automated/version-bump
+          labels: version-bump
+          delete-branch: true
