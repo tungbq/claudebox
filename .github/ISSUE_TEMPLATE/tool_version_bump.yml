@@ -1,0 +1,47 @@
+name: Tool version bump
+description: A pinned tool (claude-code, node, python, gh, uv, yq, gosu) has a newer release
+labels: ["version-bump"]
+body:
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Tool
+      options:
+        - claude-code
+        - node
+        - npm
+        - python
+        - gh
+        - uv
+        - yq
+        - gosu
+    validations:
+      required: true
+
+  - type: input
+    id: current-version
+    attributes:
+      label: Currently pinned version
+      description: >-
+        Check `claudebox_info.json` first; for node/npm/yq/gosu also check the
+        matching `scripts/install-<tool>.sh` constant.
+    validations:
+      required: true
+
+  - type: input
+    id: new-version
+    attributes:
+      label: Newly released version
+    validations:
+      required: true
+
+  - type: input
+    id: changelog
+    attributes:
+      label: Changelog / release notes link
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else worth knowing
+      description: Breaking changes, new env vars, changed config-dir behavior, etc.

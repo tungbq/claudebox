@@ -1,0 +1,5 @@
+# Every shell script in this repo is COPYed into the image and executed by Linux. A
+# Windows clone with core.autocrlf=true would otherwise check them out with CRLF, and
+# the build dies at the first RUN with `/usr/bin/env: 'bash\r': No such file or
+# directory`. Normalize to LF in the working tree on every platform.
+* text=auto eol=lf

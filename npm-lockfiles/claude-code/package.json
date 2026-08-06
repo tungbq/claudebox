@@ -1,0 +1,11 @@
+{
+  "name": "claudebox-claude-code-lockfile",
+  "private": true,
+  "description": "Pinned, integrity-locked install set for claudebox — see scripts/gen-lockfile.sh",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.220"
+  },
+  "allowScripts": {
+    "@anthropic-ai/claude-code@2.1.220": true
+  }
+}

@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Node (local tooling only — the image installs its own claude-code)
+node_modules/
+npm-debug.log*
+
+# Shell/test tooling
+.bats/
+
+# Local build/scan output
+*.sbom.json
+trivy-results.sarif
+
+# Throwaway verification spike — findings are reported, scripts are not shipped
+spike/
+
+# ClaudeKit-generated planning docs and tool state — local working files, not shipped
+plans/
+docs/journals/
+.claude/
+
+# Secrets — never commit these
+.env
+.env.*
+!.env.example

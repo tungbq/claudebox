@@ -1,0 +1,56 @@
+#!/bin/sh
+# Dispatcher for the cbox helper CLI. Resolves a subcommand to cmd/<name>.sh. `cbox` bare
+# or `cbox help` prints usage and exits 0; an unrecognized subcommand prints usage to
+# stderr and exits 1, so scripting against it can tell "you asked for help" from "you
+# made a typo." Never proxies `claude` — cbox only reports on and configures the
+# environment; run `claude` directly.
+set -eu
+
+# $0 is a symlink (/usr/local/bin/cbox -> /usr/local/lib/cbox/cbox in the image), so
+# resolve it fully before deriving script_dir — a bare dirname of $0 would give
+# /usr/local/bin, where common.sh and cmd/ don't exist.
+real_path="$(readlink -f -- "$0" 2>/dev/null || echo "$0")"
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$real_path")" && pwd)"
+# In the image this file and common.sh are flat siblings under /usr/local/lib/cbox/; in a
+# repo checkout under cli/, common.sh lives at ../scripts/lib/common.sh instead.
+if [ -f "$script_dir/common.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$script_dir/common.sh"
+else
+  # shellcheck disable=SC1091
+  . "$script_dir/../scripts/lib/common.sh"
+fi
+
+usage() {
+  cat <<'EOF'
+Usage: cbox <command> [args]
+
+Commands:
+  doctor            health check: version, auth, config symlinks, workspace mount
+  versions          installed vs pinned versions, flags drift
+  info              image version, base, build date, arch
+  help              show this message
+
+`claudebox` is an alias for `cbox`.
+EOF
+}
+
+cmd="${1:-help}"
+if [ "$#" -gt 0 ]; then
+  shift
+fi
+
+case "$cmd" in
+  doctor | versions | info)
+    exec sh "$script_dir/cmd/${cmd}.sh" "$@"
+    ;;
+  help | -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    log_error "unknown command: $cmd"
+    usage >&2
+    exit 1
+    ;;
+esac
