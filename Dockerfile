@@ -2,7 +2,7 @@
 
 # Base: Ubuntu 24.04 + system packages + dev tooling. No Claude Code here — that layer
 # must be independently buildable and cacheable, and stays root-only until it appends.
-FROM ubuntu:24.04 AS base
+FROM ubuntu:26.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 COPY scripts/install-system-tools.sh /tmp/install-system-tools.sh
 RUN chmod +x /tmp/install-system-tools.sh \
@@ -18,7 +18,7 @@ RUN chmod +x /tmp/install-gosu.sh \
 
 # Node: downloaded and checksum-verified in its own throwaway stage, independent of the
 # apt layer above, so a Node version bump doesn't invalidate the system-tools cache.
-FROM ubuntu:24.04 AS node
+FROM ubuntu:26.04 AS node
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl xz-utils \
@@ -29,7 +29,7 @@ RUN chmod +x /tmp/install-node.sh \
  && rm /tmp/install-node.sh
 
 # yq: same pattern — mikefarah/yq (the `yq eval` tool), not Ubuntu's unrelated apt package.
-FROM ubuntu:24.04 AS yq
+FROM ubuntu:26.04 AS yq
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl \
