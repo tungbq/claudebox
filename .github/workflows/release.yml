@@ -39,7 +39,7 @@ jobs:
       # build — so the bits Trivy scanned here are provably the bits that ship.
       - name: Build and push to staging (both arches, one multi-arch manifest)
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
