@@ -94,7 +94,7 @@ jobs:
       # criterion) must publish its semver tag without moving `latest` to an untested RC.
       - name: Docker metadata (semver + guarded latest, GHCR)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
@@ -159,7 +159,7 @@ jobs:
       - name: Docker metadata (semver + guarded latest, Docker Hub)
         if: ${{ vars.DOCKERHUB_ENABLED == 'true' }}
         id: meta_dockerhub
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: docker.io/tungbq/claudebox
           tags: |
