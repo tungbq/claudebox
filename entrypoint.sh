@@ -180,7 +180,15 @@ cleanup() {
 }
 trap cleanup TERM INT EXIT
 
-env PATH="$AGENT_PATH" gosu agent "$@" &
+# `<&0`: without an explicit input redirection, bash silently redirects an async (`&`)
+# command's stdin to /dev/null whenever job control is off — true here, since this script
+# runs non-interactively as the container's PID 1. That's invisible to `pwd` or any
+# command that never reads stdin, and `claude` likely dodges it by opening /dev/tty
+# directly (typical for a TUI), but it breaks `bash`, `sh`, or anything else expecting to
+# read from stdin: it sees immediate EOF and exits right away, even under `docker run -it`.
+# The redirection here is otherwise a no-op (dups fd 0 to itself) — its only job is to
+# make this an explicit redirection so bash's auto-null rule doesn't apply.
+env PATH="$AGENT_PATH" gosu agent "$@" <&0 &
 child_pid=$!
 wait "$child_pid"
 exit_code=$?
