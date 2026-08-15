@@ -1,0 +1,128 @@
+name: Publish pre-release image
+
+# There's no required-check branch protection on this repo (private repos need a paid
+# plan for that), so a push to main isn't guaranteed to have passed pr-build-test.yml.
+# This workflow re-verifies the image itself (build + bats) before publishing anything -
+# the `publish` job depends on `verify` passing, not on trusting main's history.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - scripts/**
+      - npm-lockfiles/**
+      - cli/**
+      - entrypoint.sh
+      - claudebox_info.json
+      - .github/workflows/publish-prerelease.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+        include:
+          - platform: linux/amd64
+            arch_label: amd64
+          - platform: linux/arm64
+            arch_label: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v4
+        if: matrix.platform == 'linux/arm64'
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Set build metadata
+        id: meta
+        run: echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      # Own cache scope (publish-<arch>), separate from pr-build-test.yml's, so a
+      # broken/slow cache here can never affect PR CI and vice versa. The publish job
+      # below reuses this same scope to promote these exact layers instead of rebuilding.
+      - name: Build (no push) and populate cache
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          push: false
+          load: true
+          tags: claudebox:verify
+          build-args: |
+            BUILD_DATE=${{ steps.meta.outputs.build_date }}
+            REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=publish-${{ matrix.arch_label }}
+          cache-to: type=gha,mode=max,scope=publish-${{ matrix.arch_label }}
+
+      - name: Smoke test
+        run: |
+          docker run --rm claudebox:verify id agent | grep -q 'uid=1000(agent) gid=1000(agent)'
+          docker run --rm claudebox:verify claude --version
+          docker run --rm claudebox:verify cbox info >/dev/null
+          git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
+          IMAGE=claudebox:verify /tmp/bats-core/bin/bats tests/test-cbox.bats
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Set build metadata
+        id: meta
+        run: echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # `edge` always points at the latest verified main - this project has no versioned
+      # releases yet (see README status), so this is deliberately not `latest`, which
+      # would imply a stability guarantee that doesn't exist. `sha-<short>` is the
+      # immutable per-commit tag for anyone who wants to pin.
+      - name: Derive tags
+        id: tags
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          sha_short="$(git rev-parse --short HEAD)"
+          {
+            echo "tags<<TAGEOF"
+            echo "${image}:edge"
+            echo "${image}:sha-${sha_short}"
+            echo "TAGEOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # Same context/platforms/cache scopes as the verify job above: this promotes the
+      # already-tested layers to the registry rather than rebuilding from scratch.
+      - name: Build and push (promote verified layers)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            BUILD_DATE=${{ steps.meta.outputs.build_date }}
+            REVISION=${{ github.sha }}
+          cache-from: |
+            type=gha,scope=publish-amd64
+            type=gha,scope=publish-arm64
+          provenance: true
