@@ -7,11 +7,10 @@
 Minimal Ubuntu 24.04 container image with Claude Code and a lean dev toolset. Pull, run,
 mount your code, start working.
 
-**Sibling project:** [tungbq/aiagentkit](https://github.com/tungbq/aiagentkit) — same
-architecture and release discipline, with several more AI coding agent CLIs installed
-alongside Claude Code instead of just the one. Reach for that one if you want the fuller
-agent lineup; reach for this one if Claude Code is all you run and you'd rather not carry
-the rest.
+**Built disposable.** No container is precious — `docker rm` it any time. The only state
+that matters lives in one place, the `~/.cbox` volume: your `claude` login, git config,
+`gh` auth. Rebuild the image whenever the pinned tool versions move; the environment
+underneath is meant to be thrown away and remade, not nursed.
 
 ## Tool versions
 
