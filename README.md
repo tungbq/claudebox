@@ -74,7 +74,9 @@ headless/CI mode, `HOST_UID`/`HOST_GID` overrides) and the `cbox` CLI.
 [`docs/build.md`](docs/build.md) covers building it yourself — build args, multi-arch,
 verification, and troubleshooting. Windows users: see
 [`docs/windows.md`](docs/windows.md) for Git Bash/cmd.exe syntax, line-ending gotchas,
-SSH forwarding, and where to keep your code for best I/O performance.
+SSH forwarding, and where to keep your code for best I/O performance. Pointing this at a
+project you already have checked out? See
+[`docs/existing-project.md`](docs/existing-project.md).
 
 ## Security posture
 
