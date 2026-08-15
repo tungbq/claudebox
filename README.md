@@ -40,10 +40,42 @@ an unlabeled tool-versions table.
 
 ## Usage
 
-See [`docs/usage.md`](docs/usage.md) for running the image and the full `cbox` CLI
-reference. [`docs/build.md`](docs/build.md) covers building it yourself — build args,
-multi-arch, verification, and troubleshooting. Windows users: start with
-[`docs/windows.md`](docs/windows.md).
+Build once, then run — mount your code at `/workspace` and a named volume at
+`/home/agent/.cbox` so your `claude` login (and git/gh config) survives `docker rm`.
+
+### Linux / macOS / WSL2
+
+```bash
+docker build -t claudebox:dev .
+
+docker run --rm -it \
+  -v "$PWD":/workspace \
+  -v claudebox-config:/home/agent/.cbox \
+  claudebox:dev
+```
+
+### Windows (PowerShell, Docker Desktop + WSL2 backend)
+
+```powershell
+docker build -t claudebox:dev .
+
+docker run --rm -it `
+  -v "${PWD}:/workspace" `
+  -v claudebox-config:/home/agent/.cbox `
+  claudebox:dev
+```
+
+Either command drops you into `bash` inside the container — a minimal Ubuntu 24.04 box
+with `git`, `gh`, `node`, `python3`/`uv`, `rg`, `fd`, `jq`/`yq`, and Claude Code already
+installed. Run `claude` to log in (first time only — it persists in the
+`claudebox-config` volume) and work like you would on a normal machine.
+
+See [`docs/usage.md`](docs/usage.md) for the full run reference (SSH forwarding,
+headless/CI mode, `HOST_UID`/`HOST_GID` overrides) and the `cbox` CLI.
+[`docs/build.md`](docs/build.md) covers building it yourself — build args, multi-arch,
+verification, and troubleshooting. Windows users: see
+[`docs/windows.md`](docs/windows.md) for Git Bash/cmd.exe syntax, line-ending gotchas,
+SSH forwarding, and where to keep your code for best I/O performance.
 
 ## Security posture
 
