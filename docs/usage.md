@@ -82,6 +82,33 @@ docker run --rm \
   claudebox:dev claude -p "some prompt"
 ```
 
+### Alternate / free model providers (optional)
+
+Claude Code reads `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` from the environment
+and talks to whatever Anthropic-Messages-API-compatible endpoint they point at — nothing
+in this image restricts or rewrites them, so they pass through like any other `-e`:
+
+```bash
+docker run --rm -it \
+  -v "$PWD":/workspace \
+  -v claudebox-config:/home/agent/.cbox \
+  -e ANTHROPIC_BASE_URL="https://your-proxy.example" \
+  -e ANTHROPIC_AUTH_TOKEN="your-token" \
+  claudebox:dev claude
+```
+
+This is how you'd route Claude Code through a self-hosted proxy that translates the
+Anthropic Messages API to another backend — a self-hosted LiteLLM instance or a similar
+OSS translation layer is the usual way to reach a free-tier or local model this way,
+useful for basic, low-stakes tasks where you'd rather not spend an Anthropic quota.
+
+**Caveat:** Claude Code's agentic loop (tool calling, file edits, multi-step planning) is
+tuned against real Claude models. A non-Claude model behind the proxy will often follow
+tool-call formats and instructions less reliably — expect it to work for simple prompts
+and degrade on anything that leans on the agent's tool use. This isn't something the
+project tests or supports beyond "the env vars pass through cleanly"; no image or
+entrypoint change was needed for it to work.
+
 ## Logging in
 
 Run `claude` — it prints a URL, approve on any device, paste the code back. Headless:
