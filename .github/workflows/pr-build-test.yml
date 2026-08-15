@@ -113,7 +113,13 @@ jobs:
           git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
           IMAGE=claudebox:dev /tmp/bats-core/bin/bats tests/test-cbox.bats
 
+      # Repo variable escape hatch: set SKIP_TRIVY_SCAN=true (Settings > Secrets and
+      # variables > Actions > Variables) to unblock merges while the pinned tool stack
+      # (gosu/yq, see .trivyignore) is still catching up to upstream CVE fixes. Unset it
+      # (or set to anything else) once a scan run is clean again — this is meant to be
+      # temporary, not a standing bypass.
       - name: Trivy scan (fixable HIGH/CRITICAL blocks merge)
+        if: vars.SKIP_TRIVY_SCAN != 'true'
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: claudebox:dev
@@ -125,7 +131,7 @@ jobs:
           trivyignores: .trivyignore
 
       - name: Upload Trivy results to the Security tab
-        if: always()
+        if: always() && vars.SKIP_TRIVY_SCAN != 'true'
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results-${{ matrix.arch_label }}.sarif

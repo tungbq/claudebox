@@ -126,7 +126,21 @@ if [ "$TARGET_UID" != "$(id -u agent)" ]; then
   # defense-in-depth on top of that, not the primary fix — do not widen this to
   # `-R /home/agent` without re-checking the Dockerfile's ownership first.
   chown "$TARGET_UID:$TARGET_GID" /home/agent
-  find /home/agent -maxdepth 1 -not -name .agents -not -name . -exec chown "$TARGET_UID:$TARGET_GID" {} +
+  # A bind-mounted top-level entry (e.g. `-e CBOX_LINK_SSH=1 -v ~/.ssh:/home/agent/.ssh:ro`)
+  # must be skipped, not just filtered like .agents above: chown() on a read-only mount
+  # fails with EROFS even when the target uid already matches — it's a real syscall, not a
+  # no-op skip, and there is no ownership to fix from inside the container anyway since the
+  # mount's ownership is governed entirely by the host side. /home/agent/.cbox is the one
+  # mount that legitimately needs re-owning here (a freshly created named volume starts
+  # root-owned); it gets that from the dedicated, targeted chown right below instead.
+  for entry in /home/agent/.[!.]* /home/agent/*; do
+    [ -e "$entry" ] || continue
+    case "$(basename "$entry")" in
+      .agents) continue ;;
+    esac
+    mountpoint -q "$entry" && continue
+    chown "$TARGET_UID:$TARGET_GID" "$entry"
+  done
 fi
 
 # A freshly created named volume is always root-owned by Docker itself, regardless of

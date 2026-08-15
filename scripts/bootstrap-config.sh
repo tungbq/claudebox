@@ -87,9 +87,20 @@ link_dir() {
 }
 
 # Same copy -> verify -> swap discipline as link_dir, for single files that live outside
-# a tool's own config directory (Claude Code's ~/.claude.json).
+# a tool's own config directory (Claude Code's ~/.claude.json). $3 is the content to seed
+# the store with the first time it's ever created — defaults to empty. Claude Code parses
+# ~/.claude.json as JSON on every launch, so a truly empty file is corrupt to it before the
+# agent has ever run `claude` once; callers for JSON-backed targets must pass '{}'.
+#
+# $target itself never persists across containers — only $store, under $CBOX_HOME, lives
+# on the mounted volume. So on every container after the first, $target is freshly absent
+# again even though $store already holds real content from a prior run. Seeding must key
+# off whether *$store* is new, never off whether $target exists: gating on $target would
+# truncate real persisted content (an OAuth token, a gitconfig) back to the default on
+# every single restart, silently discarding it. `[ -e "$target" ]` only fires for a real,
+# non-symlinked file already sitting at $target — the pre-$CBOX_HOME migration case.
 link_file() {
-  local target="$1" name="$2"
+  local target="$1" name="$2" default_content="${3:-}"
   local store="$CBOX_HOME/$name"
 
   if [ -L "$target" ]; then
@@ -107,15 +118,25 @@ link_file() {
     fi
     mv "$target" "$backup"
     log_warn "migrated existing $name into $store; original preserved at $backup"
-  else
-    : > "$store"
+  elif [ ! -e "$store" ]; then
+    printf '%s' "$default_content" > "$store"
   fi
 
   ln -s "$store" "$target"
 }
 
 link_dir "$HOME/.claude" claude
-link_file "$HOME/.claude.json" claude.json
+link_file "$HOME/.claude.json" claude.json '{}'
+
+# Self-heal for config volumes created by a claudebox build predating the '{}' default
+# above: those seeded the store as a truly empty file, which Claude Code treats as
+# corrupt JSON on every launch. link_file() only seeds a fresh store — once the symlink
+# exists it returns early every subsequent start — so an already-broken volume never
+# self-corrects without this. Only touch it if still empty; never overwrite real content.
+if [ -L "$HOME/.claude.json" ] && [ ! -s "$CBOX_HOME/claude.json" ]; then
+  printf '{}' > "$CBOX_HOME/claude.json"
+  log_warn "healed empty ~/.claude.json in $CBOX_HOME (was invalid JSON from an older claudebox bootstrap)"
+fi
 
 mkdir -p "$HOME/.config"
 link_dir "$HOME/.config/gh" gh
