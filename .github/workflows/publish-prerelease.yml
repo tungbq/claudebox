@@ -1,9 +1,11 @@
 name: Publish pre-release image
 
-# There's no required-check branch protection on this repo (private repos need a paid
-# plan for that), so a push to main isn't guaranteed to have passed pr-build-test.yml.
-# This workflow re-verifies the image itself (build + bats) before publishing anything -
-# the `publish` job depends on `verify` passing, not on trusting main's history.
+# main now has required-check branch protection (shellcheck + build-test-scan on both
+# arches from pr-build-test.yml), so a push to main has passed those. This workflow still
+# re-verifies the image itself (build + bats + Trivy) before publishing rather than
+# trusting that history — the `publish` job depends on `verify` passing here, not on
+# branch protection alone, since protection covers merges to main but not every path that
+# can push to it (e.g. an admin bypass, or a direct push if one were ever allowed).
 
 on:
   push:
