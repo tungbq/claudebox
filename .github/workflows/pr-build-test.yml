@@ -1,17 +1,13 @@
 name: PR build, test, scan
 
 on:
-  pull_request:
-    paths:
-      - Dockerfile
-      - scripts/**
-      - npm-lockfiles/**
-      - cli/**
-      - entrypoint.sh
-      - tests/**
-      - claudebox_info.json
-      - .trivyignore
-      - .github/workflows/pr-build-test.yml
+  # No `paths:` filter here (unlike `push` below): main's branch protection requires
+  # the `shellcheck` and `build-test-scan` job names to report on every PR, and a
+  # workflow-level path filter means the workflow — and those required contexts — never
+  # run at all for a PR that only touches paths outside the list, permanently blocking
+  # merge. Each job instead checks paths itself (`Detect relevant path changes` below)
+  # and no-ops when nothing relevant changed, so the required contexts always report.
+  pull_request: {}
   push:
     branches: [main]
     paths:
@@ -33,7 +29,25 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+
+      - name: Detect relevant path changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+          changed="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD)"
+          echo "$changed"
+          if echo "$changed" | grep -qE '^(Dockerfile|scripts/|npm-lockfiles/|cli/|entrypoint\.sh|tests/|claudebox_info\.json|\.trivyignore|\.github/workflows/pr-build-test\.yml)'; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: shellcheck cli/ and entrypoint.sh
+        if: steps.changes.outputs.relevant == 'true'
         run: |
           shellcheck --shell=sh cli/cbox cli/cmd/*.sh scripts/lib/common.sh
           shellcheck entrypoint.sh scripts/bootstrap-config.sh scripts/install-*.sh \
@@ -57,16 +71,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Detect relevant path changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+          changed="$(git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD)"
+          echo "$changed"
+          if echo "$changed" | grep -qE '^(Dockerfile|scripts/|npm-lockfiles/|cli/|entrypoint\.sh|tests/|claudebox_info\.json|\.trivyignore|\.github/workflows/pr-build-test\.yml)'; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: docker/setup-qemu-action@v4
-        if: matrix.platform == 'linux/arm64'
+        if: steps.changes.outputs.relevant == 'true' && matrix.platform == 'linux/arm64'
 
       - uses: docker/setup-buildx-action@v3
+        if: steps.changes.outputs.relevant == 'true'
 
       - name: Set build metadata
         id: meta
+        if: steps.changes.outputs.relevant == 'true'
         run: echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Build (no push)
+        if: steps.changes.outputs.relevant == 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -81,6 +114,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.arch_label }}
 
       - name: Base image checks
+        if: steps.changes.outputs.relevant == 'true'
         run: |
           docker run --rm claudebox:dev id agent | grep -q 'uid=1000(agent) gid=1000(agent)'
           if docker run --rm claudebox:dev id ubuntu >/dev/null 2>&1; then
@@ -102,11 +136,13 @@ jobs:
           fi
 
       - name: Claude Code + version tooling checks
+        if: steps.changes.outputs.relevant == 'true'
         run: |
           scripts/verify-versions.sh claudebox:dev
           scripts/smoke-test.sh claudebox:dev
 
       - name: cbox CLI checks (bats)
+        if: steps.changes.outputs.relevant == 'true'
         run: |
           docker run --rm claudebox:dev cbox >/dev/null
           docker run --rm claudebox:dev claudebox >/dev/null
@@ -121,7 +157,7 @@ jobs:
       # the gate below does the blocking with `format: table`, where the HIGH/CRITICAL
       # filter actually applies — the same shape release.yml already uses.
       - name: Trivy report for the Security tab (all severities, never blocks)
-        if: vars.SKIP_TRIVY_SCAN != 'true'
+        if: steps.changes.outputs.relevant == 'true' && vars.SKIP_TRIVY_SCAN != 'true'
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: claudebox:dev
@@ -135,7 +171,7 @@ jobs:
       # repo without it this returns "Resource not accessible by integration". Losing the
       # Security tab report must not fail the build — the gate below is what blocks merges.
       - name: Upload Trivy results to the Security tab
-        if: always() && vars.SKIP_TRIVY_SCAN != 'true'
+        if: always() && steps.changes.outputs.relevant == 'true' && vars.SKIP_TRIVY_SCAN != 'true'
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
@@ -152,7 +188,7 @@ jobs:
       # skip PRs only. Per-event control would need the condition to test
       # `github.event_name` (or a second variable) instead.
       - name: Trivy gate (fixable HIGH/CRITICAL blocks merge)
-        if: vars.SKIP_TRIVY_SCAN != 'true'
+        if: steps.changes.outputs.relevant == 'true' && vars.SKIP_TRIVY_SCAN != 'true'
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: claudebox:dev
