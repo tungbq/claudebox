@@ -39,29 +39,29 @@ an unlabeled tool-versions table.
 
 ## Usage
 
-Build once, then run — mount your code at `/workspace` and a named volume at
-`/home/agent/.cbox` so your `claude` login (and git/gh config) survives `docker rm`.
+Pull and run — mount your code at `/workspace` and a named volume at `/home/agent/.cbox`
+so your `claude` login (and git/gh config) survives `docker rm`.
 
 ### Linux / macOS / WSL2
 
 ```bash
-docker build -t claudebox:dev .
+docker pull ghcr.io/tungbq/claudebox:edge
 
 docker run --rm -it \
   -v "$PWD":/workspace \
   -v claudebox-config:/home/agent/.cbox \
-  claudebox:dev
+  ghcr.io/tungbq/claudebox:edge
 ```
 
 ### Windows (PowerShell, Docker Desktop + WSL2 backend)
 
 ```powershell
-docker build -t claudebox:dev .
+docker pull ghcr.io/tungbq/claudebox:edge
 
 docker run --rm -it `
   -v "${PWD}:/workspace" `
   -v claudebox-config:/home/agent/.cbox `
-  claudebox:dev
+  ghcr.io/tungbq/claudebox:edge
 ```
 
 Either command drops you into `bash` inside the container — a minimal Ubuntu 24.04 box
@@ -69,10 +69,17 @@ with `git`, `gh`, `node`, `python3`/`uv`, `rg`, `fd`, `jq`/`yq`, and Claude Code
 installed. Run `claude` to log in (first time only — it persists in the
 `claudebox-config` volume) and work like you would on a normal machine.
 
+`edge` tracks the latest verified `main` (see [Status](#status)); pin an immutable build
+instead with `ghcr.io/tungbq/claudebox:sha-<short>` from the
+[packages page](https://github.com/tungbq/claudebox/pkgs/container/claudebox). Prefer to
+build locally — to audit the layers, pin a `HOST_UID`/`HOST_GID` at build time, or track
+uncommitted changes — swap the `docker pull` line for
+`docker build -t claudebox:dev .` and use `claudebox:dev` in place of the image
+reference above; see [`docs/build.md`](docs/build.md) for build args, multi-arch, and
+verification.
+
 See [`docs/usage.md`](docs/usage.md) for the full run reference (SSH forwarding,
-headless/CI mode, `HOST_UID`/`HOST_GID` overrides) and the `cbox` CLI.
-[`docs/build.md`](docs/build.md) covers building it yourself — build args, multi-arch,
-verification, and troubleshooting. Windows users: see
+headless/CI mode, `HOST_UID`/`HOST_GID` overrides) and the `cbox` CLI. Windows users: see
 [`docs/windows.md`](docs/windows.md) for Git Bash/cmd.exe syntax, line-ending gotchas,
 SSH forwarding, and where to keep your code for best I/O performance.
 
