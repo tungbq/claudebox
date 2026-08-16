@@ -21,6 +21,9 @@ trivy-results.sarif
 # Throwaway verification spike — findings are reported, scripts are not shipped
 spike/
 
+# Local demo workspace + its config volume mount — real code and credentials land here
+demo-ws/
+
 # ClaudeKit-generated planning docs and tool state — local working files, not shipped
 plans/
 docs/journals/

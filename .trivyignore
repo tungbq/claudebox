@@ -31,6 +31,22 @@ CVE-2026-42504
 CVE-2026-39822
 CVE-2026-56852
 
+# A second wave of Go stdlib CVEs landed after the entries above were written. These hit
+# every statically compiled Go binary in the image at once — gosu 1.19 (go1.24.6), yq
+# v4.53.3 (go1.26.4), and gh 2.97.0 (go1.26.5). All three are the latest upstream release
+# (verified via GitHub API 2026-08-16); none has been rebuilt against a patched toolchain
+# yet, so there is no version to bump to. CVE-2026-46600 additionally shows up as
+# golang.org/x/net v0.55.0 vendored into yq — same story, fixed by a yq rebuild we don't
+# control. Re-review 2026-11-01.
+CVE-2026-33818
+CVE-2026-39821
+CVE-2026-46600
+CVE-2026-56853
+CVE-2026-56858
+CVE-2026-56859
+CVE-2026-56860
+CVE-2026-56862
+
 # npm 12.0.1's own bundled brace-expansion (5.0.7, under
 # /usr/local/lib/node_modules/npm/node_modules/) carries this CVE. `npm install -g
 # npm@12.0.2` (the only newer patch available as of 2026-08-01) does not replace it —
@@ -38,3 +54,12 @@ CVE-2026-56852
 # known npm limitation, not something this Dockerfile can force. Not our code to patch
 # directly; tracked for the next Node/npm version bump. Re-review 2026-11-01.
 CVE-2026-14257
+
+# Same npm-bundled-dependency situation as above, found in the 2026-08-16 scan: a newer
+# brace-expansion CVE plus one in ip-address 10.2.0, both under npm's own
+# /usr/local/lib/node_modules/npm/node_modules/. Neither is in
+# npm-lockfiles/claude-code/package-lock.json, so regenerating that lockfile does not
+# reach them, and node 22.23.2 is the latest 22.x (verified 2026-08-16) — there is no
+# Node bump available that ships a patched npm bundle. Re-review 2026-11-01.
+CVE-2026-69152
+CVE-2026-69192
