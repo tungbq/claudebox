@@ -2,7 +2,6 @@
 
 [![PR build, test, scan](https://github.com/tungbq/claudebox/actions/workflows/pr-build-test.yml/badge.svg)](https://github.com/tungbq/claudebox/actions/workflows/pr-build-test.yml)
 [![Scheduled security scan](https://github.com/tungbq/claudebox/actions/workflows/scheduled-security-scan.yml/badge.svg)](https://github.com/tungbq/claudebox/actions/workflows/scheduled-security-scan.yml)
-[![Scheduled version check](https://github.com/tungbq/claudebox/actions/workflows/scheduled-version-check.yml/badge.svg)](https://github.com/tungbq/claudebox/actions/workflows/scheduled-version-check.yml)
 
 Minimal Ubuntu 24.04 container image with Claude Code and a lean dev toolset. Pull, run,
 mount your code, start working.
