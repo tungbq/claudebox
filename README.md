@@ -74,8 +74,34 @@ headless/CI mode, `HOST_UID`/`HOST_GID` overrides) and the `cbox` CLI.
 [`docs/build.md`](docs/build.md) covers building it yourself — build args, multi-arch,
 verification, and troubleshooting. Windows users: see
 [`docs/windows.md`](docs/windows.md) for Git Bash/cmd.exe syntax, line-ending gotchas,
-SSH forwarding, and where to keep your code for best I/O performance. Pointing this at a
-project you already have checked out? See
+SSH forwarding, and where to keep your code for best I/O performance.
+
+## Use it on a project you already have
+
+Nothing to set up on the repo's side. `/workspace` is a direct bind mount, not a copy, so
+you can point it at a real checkout and start working:
+
+```bash
+cd ~/code/your-existing-project
+
+docker run --rm -it \
+  -v "$PWD":/workspace \
+  -v claudebox-config:/home/agent/.cbox \
+  claudebox:dev
+```
+
+`agent` sees exactly what you see — `.git`, your existing branches, `node_modules`, build
+output. Edits land on the host immediately rather than in a synced copy, so anything
+`claude` writes or commits shows up in your host git tools the moment it happens.
+
+The `claudebox-config` volume is tied to your login, not to a project: authenticate once,
+then reuse it across every repo you mount, months apart, with no re-login. Point a
+different volume at it when you want work and personal accounts kept apart.
+
+Two things to know before aiming it at a real project. The image ships no compiler, so an
+install step that needs `node-gyp` or a source build without a prebuilt wheel will fail
+here even though it works on your host. And if the project directory is owned by another
+user, the uid remap needs a look first. Both are covered in
 [`docs/existing-project.md`](docs/existing-project.md).
 
 ## Security posture
@@ -100,8 +126,13 @@ Full detail in [`docs/codebase-summary.md`](docs/codebase-summary.md) and
 
 ## Status
 
-Pre-release. No image has been published to `ghcr.io/tungbq/claudebox` yet — build it
-yourself per [`docs/usage.md`](docs/usage.md) until a tagged release exists.
+Pre-release — there is no tagged release yet, and no version number to pin to.
+
+Every verified `main` is published to `ghcr.io/tungbq/claudebox:edge`, alongside an
+immutable `sha-<short>` tag for anyone who wants a fixed reference. `edge` moves with
+`main` and deliberately isn't called `latest`, which would imply a stability guarantee
+this project can't make yet. Building the image yourself per
+[`docs/usage.md`](docs/usage.md) remains fully supported.
 
 ## License
 

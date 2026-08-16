@@ -2,9 +2,14 @@
 
 ## Supported Versions
 
-No image is published yet — this project is pre-release; see the README's Status
-section. Once images are published, only the most recent `latest` tag and the most
-recent tagged release will receive security fixes. There is no long-term support branch.
+This project is pre-release; see the README's Status section. The only published images
+are `edge` (whatever the latest verified `main` is) and the per-commit `sha-<short>`
+tags. Fixes land on `edge` by moving `main` forward — older `sha-` tags are immutable
+and never patched in place, so pinning one means opting out of security updates.
+
+There is no tagged release yet. Once one exists, only the most recent `latest` tag and
+the most recent tagged release will receive security fixes. There is no long-term
+support branch.
 
 ## Reporting a Vulnerability
 
@@ -33,9 +38,17 @@ README's "Security posture" section for the summary and
 
 Every PR and push to `main` builds the image and runs it through Trivy, gated on
 fixable HIGH/CRITICAL findings (`--ignore-unfixed`); results publish to this
-repository's Security tab. Findings we can't fix ourselves yet — because upstream
-hasn't shipped a patched release — are documented with a dated justification and
-re-review expiry in [`.trivyignore`](.trivyignore), not silently suppressed. The same
-gate runs again before any tagged release, plus a weekly re-scan of the published
-`:latest` image once one exists (see the README's Status section — none has been
-published yet, so there's nothing for that weekly job to scan today).
+repository's Security tab. The same gate runs before the `edge` image is pushed to
+ghcr.io, and again before any tagged release — nothing reaches the registry without
+passing it.
+
+Findings we can't fix ourselves yet — because upstream hasn't shipped a patched
+release — are documented with a dated justification and re-review expiry in
+[`.trivyignore`](.trivyignore), not silently suppressed. Everything currently listed
+there is a Go stdlib or bundled-dependency issue inside a third-party binary that has
+no patched upstream build available.
+
+One gap worth stating plainly: the weekly re-scan job targets the `:latest` tag, which
+only a tagged release creates. Until then it has nothing to scan, so published `edge`
+images are covered by the gate at publish time but not by an ongoing re-scan that would
+catch CVEs disclosed afterwards.
