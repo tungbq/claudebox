@@ -70,6 +70,23 @@ jobs:
           git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
           IMAGE=claudebox:verify /tmp/bats-core/bin/bats tests/test-cbox.bats
 
+      # Without this, `verify` could green-light an image that pr-build-test.yml would
+      # have blocked, and the publish job below would push it to ghcr.io. `format: table`
+      # is required for the severity filter to apply — see the note in pr-build-test.yml.
+      #
+      # Deliberately not wired to SKIP_TRIVY_SCAN: that escape hatch exists to unblock PR
+      # review, and release.yml's gate is unconditional for the same reason. Nothing
+      # should reach the registry without passing the scan.
+      - name: Trivy gate (fixable HIGH/CRITICAL blocks publish)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: claudebox:verify
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+          trivyignores: .trivyignore
+
   publish:
     needs: verify
     runs-on: ubuntu-24.04
