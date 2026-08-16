@@ -71,12 +71,21 @@ installed. Run `claude` to log in (first time only — it persists in the
 
 `edge` tracks the latest verified `main` (see [Status](#status)); pin an immutable build
 instead with `ghcr.io/tungbq/claudebox:sha-<short>` from the
-[packages page](https://github.com/tungbq/claudebox/pkgs/container/claudebox). Prefer to
-build locally — to audit the layers, pin a `HOST_UID`/`HOST_GID` at build time, or track
-uncommitted changes — swap the `docker pull` line for
-`docker build -t claudebox:dev .` and use `claudebox:dev` in place of the image
-reference above; see [`docs/build.md`](docs/build.md) for build args, multi-arch, and
-verification.
+[packages page](https://github.com/tungbq/claudebox/pkgs/container/claudebox). `docker
+pull` works from any directory — no checkout needed.
+
+Prefer to build it yourself — to audit the layers, pin a `HOST_UID`/`HOST_GID` at build
+time, or track uncommitted changes — clone the repo first, since `docker build` uses the
+current directory as its build context:
+
+```bash
+git clone https://github.com/tungbq/claudebox.git && cd claudebox
+docker build -t claudebox:dev .
+```
+
+Then swap the `docker pull` line above for that build, and use `claudebox:dev` in place
+of the image reference in `docker run`. See [`docs/build.md`](docs/build.md) for build
+args, multi-arch, and verification.
 
 See [`docs/usage.md`](docs/usage.md) for the full run reference (SSH forwarding,
 headless/CI mode, `HOST_UID`/`HOST_GID` overrides) and the `cbox` CLI. Windows users: see
