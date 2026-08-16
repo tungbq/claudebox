@@ -113,26 +113,47 @@ jobs:
           git clone --depth 1 https://github.com/bats-core/bats-core.git /tmp/bats-core
           IMAGE=claudebox:dev /tmp/bats-core/bin/bats tests/test-cbox.bats
 
-      # Repo variable escape hatch: set SKIP_TRIVY_SCAN=true (Settings > Secrets and
-      # variables > Actions > Variables) to unblock merges while the pinned tool stack
-      # (gosu/yq, see .trivyignore) is still catching up to upstream CVE fixes. Unset it
-      # (or set to anything else) once a scan run is clean again — this is meant to be
-      # temporary, not a standing bypass.
-      - name: Trivy scan (fixable HIGH/CRITICAL blocks merge)
+      # Reporting and gating are split into two Trivy runs on purpose. With `format: sarif`
+      # the action builds the report with ALL severities — it drops the `severity` input in
+      # that mode so the Security tab gets the complete picture. Pairing sarif output with
+      # `exit-code: 1` therefore fails the job on every LOW/MEDIUM finding too, which no
+      # .trivyignore curation can ever clear. This step is report-only (`exit-code: 0`);
+      # the gate below does the blocking with `format: table`, where the HIGH/CRITICAL
+      # filter actually applies — the same shape release.yml already uses.
+      - name: Trivy report for the Security tab (all severities, never blocks)
         if: vars.SKIP_TRIVY_SCAN != 'true'
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: claudebox:dev
           format: sarif
           output: trivy-results-${{ matrix.arch_label }}.sarif
-          severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: 1
+          exit-code: 0
           trivyignores: .trivyignore
 
+      # Code scanning uploads need a public repo or GitHub Advanced Security; on a private
+      # repo without it this returns "Resource not accessible by integration". Losing the
+      # Security tab report must not fail the build — the gate below is what blocks merges.
       - name: Upload Trivy results to the Security tab
         if: always() && vars.SKIP_TRIVY_SCAN != 'true'
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results-${{ matrix.arch_label }}.sarif
           category: trivy-${{ matrix.arch_label }}
+
+      # Repo variable escape hatch: set SKIP_TRIVY_SCAN=true (Settings > Secrets and
+      # variables > Actions > Variables) to unblock merges while the pinned tool stack
+      # (gosu/yq, see .trivyignore) is still catching up to upstream CVE fixes. Unset it
+      # (or set to anything else) once a scan run is clean again — this is meant to be
+      # temporary, not a standing bypass.
+      - name: Trivy gate (fixable HIGH/CRITICAL blocks merge)
+        if: vars.SKIP_TRIVY_SCAN != 'true'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: claudebox:dev
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+          trivyignores: .trivyignore

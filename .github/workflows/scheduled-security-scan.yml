@@ -28,26 +28,44 @@ jobs:
             echo "no ghcr.io/${{ github.repository }}:latest published yet — nothing to scan, skipping"
           fi
 
-      - name: Trivy scan (report only, does not fail the job)
+      # Split for the same reason as pr-build-test.yml: `format: sarif` makes the action
+      # report ALL severities regardless of the `severity` input, so a sarif run with
+      # `exit-code: 1` flags LOW/MEDIUM noise as well. This step only produces the report.
+      - name: Trivy report for the Security tab (all severities)
         if: steps.check.outputs.exists == 'true'
-        id: trivy
         uses: aquasecurity/trivy-action@v0.36.0
         continue-on-error: true
         with:
           image-ref: ghcr.io/${{ github.repository }}:latest
           format: sarif
           output: trivy-latest.sarif
-          severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: 1
+          exit-code: 0
           trivyignores: .trivyignore
 
       - name: Upload results to the Security tab
         if: steps.check.outputs.exists == 'true'
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-latest.sarif
           category: trivy-scheduled-latest
+
+      # This is what decides whether an issue gets filed, so it has to be the table-format
+      # run where the HIGH/CRITICAL filter is honoured — otherwise every LOW/MEDIUM finding
+      # would open a "fixable HIGH/CRITICAL" issue that says nothing of the sort.
+      - name: Trivy check for fixable HIGH/CRITICAL
+        if: steps.check.outputs.exists == 'true'
+        id: trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        continue-on-error: true
+        with:
+          image-ref: ghcr.io/${{ github.repository }}:latest
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+          trivyignores: .trivyignore
 
       - name: Open an issue if new HIGH/CRITICAL findings and none already tracked
         if: steps.check.outputs.exists == 'true' && steps.trivy.outcome == 'failure'
