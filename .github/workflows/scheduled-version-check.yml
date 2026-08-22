@@ -17,7 +17,7 @@ jobs:
     # scripts; gh and python are intentionally ".x". A green run here does not mean all
     # seven are current — see docs/build.md.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check upstream npm versions
         id: check
