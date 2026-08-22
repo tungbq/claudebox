@@ -41,7 +41,7 @@ jobs:
       - uses: docker/setup-qemu-action@v4
         if: matrix.platform == 'linux/arm64'
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Set build metadata
         id: meta
@@ -100,7 +100,7 @@ jobs:
 
       - uses: docker/setup-qemu-action@v4
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Set build metadata
         id: meta
