@@ -28,7 +28,7 @@ jobs:
   shellcheck:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Detect relevant path changes
         id: changes
@@ -69,7 +69,7 @@ jobs:
           - platform: linux/arm64
             arch_label: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Detect relevant path changes
         id: changes

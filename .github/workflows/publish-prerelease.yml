@@ -36,7 +36,7 @@ jobs:
           - platform: linux/arm64
             arch_label: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/setup-qemu-action@v4
         if: matrix.platform == 'linux/arm64'
@@ -96,7 +96,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/setup-qemu-action@v4
 
